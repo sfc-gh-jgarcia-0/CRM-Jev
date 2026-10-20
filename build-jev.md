@@ -53,6 +53,8 @@ How routing works:
 - **Low-confidence escalation:** if confidence < `ROUTER_MIN_CONFIDENCE` (default 0.25), the query moves up one tier,
   so router uncertainty costs money rather than quality.
 - **Cost:** router input tokens only (TypeSafe documents output tokens as free; observed ~190 input tokens per call).
+  The rate is **not yet observed in Snowflake billing** and is priced at a placeholder of 0. See
+  [Cost coverage](#cost-coverage--what-the-scenario-c-total-includes).
 
 Verified findings (2026-10-20, Demo account):
 
@@ -482,6 +484,7 @@ Integrate TypeSafe's production Jev routing API as a drop-in replacement for the
 | T3 | 62.9s → 71.8s | $0.3246 → $0.3730 (+15%) | 8.45 → 7.77 |
 
 Router (`snowflake-decision-fast`): 93% raw accuracy, ~0.5s and ~194 input tokens per call, 0 under-routed, 2 over-routed.
+Router cost is counted in the Scenario C total but priced at $0 pending billing verification (see Cost coverage below).
 
 Observations:
 - The savings come from Tiers 1–2, where a small model is enough. Routing costs about 0.5s and almost nothing per query.
@@ -493,6 +496,37 @@ Observations:
   scenarios (avg quality 6.21 A vs 7.26 C). The benchmark now sets `AGENT_BUDGET_SECONDS=180`.
 - Costs are estimates from `config/pricing.yaml`. Run `results/<run>/reconcile.sql` after ACCOUNT_USAGE catches up to
   get billed credits. Judge cost ($1.95 for this run) and warehouse SQL compute are excluded.
+
+### Cost coverage — what the Scenario C total includes
+
+Each query's `cost_usd` is the sum of all its pipeline steps (`QueryResult.cost_usd` in `metrics.py`):
+
+| Component | In the total? | How it is priced | Status |
+|---|---|---|---|
+| Jev router (`snowflake-decision-fast`) | Yes, as the `router` step | `gateway` rate in `pricing.yaml`, currently a **placeholder of 0** | **Unverified**: no billed rate observed yet |
+| Serving model (Haiku / Sonnet via the agent) | Yes, as the `orchestration` step | Account-derived `agent` rates for uncached input, cache read, cache write and output | Verified against billing history; this is effectively all of the $5.73 |
+| LLM judge | **No**, excluded by design | `gateway` rate for `claude-sonnet-4-5` | Reported separately ($0.96 in C, $0.99 in A) |
+| Warehouse SQL compute (agent tools) | **No**, in either scenario | not estimated | Billed credits are available via `reconcile.sql` |
+
+**Billing check (2026-10-20).** `ACCOUNT_USAGE.AI_GATEWAY_USAGE_HISTORY` showed 126 rows through 10:57 PT, all
+`claude-sonnet-4-5` (the judge calls). **None of the 120+ router calls appeared**, although they ran in the same time
+window as judge calls that did. It is not yet known whether `snowflake-decision-fast` calls are free, billed in another
+view, or delayed. To recheck:
+
+```sql
+SELECT o.key AS model, COUNT(*) AS requests, SUM(o.value:input_tokens) AS input_tokens,
+       SUM(o.value:output_tokens) AS output_tokens, SUM(h.credits) AS credits
+FROM SNOWFLAKE.ACCOUNT_USAGE.AI_GATEWAY_USAGE_HISTORY h, LATERAL FLATTEN(h.operation_details) o
+WHERE h.start_time >= '2026-10-20'::timestamp_ltz AND o.key ILIKE 'snowflake-decision%'
+GROUP BY 1;
+```
+
+When a rate is observed, set it under `gateway: snowflake-decision-fast` in `config/pricing.yaml` and re-run the reporter.
+
+**Sensitivity.** A router call uses about 194 input tokens, and output tokens are free per TypeSafe's docs. That is
+about 5,800 input tokens per 30-query run. Even priced at `claude-sonnet-4-5`'s gateway input rate (1.50 credits per 1M
+tokens), the router would add about $0.03 per run, against $3.01 of measured savings. The −34.5% conclusion holds
+**unless** the router is billed per request rather than per token. That pricing model is not yet known.
 
 ## Running
 

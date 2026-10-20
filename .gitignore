@@ -12,3 +12,11 @@ wheels/
 # Benchmark output
 results/
 .env
+
+# Management summary (not tracked)
+team_summary.md
+team_summary.pdf
+
+# TypeSafe comparison report (not tracked)
+typesafe-comparison.md
+typesafe-comparison.pdf
