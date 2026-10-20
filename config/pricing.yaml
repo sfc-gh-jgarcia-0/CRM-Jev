@@ -1,0 +1,20 @@
+# Credits per 1M tokens, used for per-query cost ESTIMATES.
+# Derived from this account's actual billing (ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY
+# credits_granular / tokens_granular and AI_GATEWAY_USAGE_HISTORY) on 2026-10-20.
+# Re-derive with the query in sql/derive_pricing.sql if rates change.
+# For exact billed credits after a run, use results/reconcile.sql (ACCOUNT_USAGE latency applies).
+
+# Cortex Agent orchestration (agent:run). Cache reads/writes are billed separately.
+agent:
+  claude-haiku-4-5:  {input: 0.65, cache_write: 0.81, cache_read: 0.06, output: 3.25}
+  claude-sonnet-4-5: {input: 1.95, cache_write: 2.44, cache_read: 0.20, output: 9.76}
+  claude-opus-4-8:   {input: 3.25, cache_write: 4.07, cache_read: 0.33, output: 16.26}
+  openai-gpt-5-mini: {input: 0.16, cache_write: 0.16, cache_read: 0.02, output: 1.30}
+
+# AI Gateway direct inference (router + judge).
+# claude-sonnet-4-5 and openai-gpt-5-nano solved from observed gateway requests (assumes typical in:out price ratio).
+# snowflake-decision-fast: not yet observed in billing — set once reconciled. Output tokens are free (TypeSafe docs).
+gateway:
+  claude-sonnet-4-5:       {input: 1.50, output: 7.50}
+  openai-gpt-5-nano:       {input: 0.0275, output: 0.22}
+  snowflake-decision-fast: {input: 0.0, output: 0.0}

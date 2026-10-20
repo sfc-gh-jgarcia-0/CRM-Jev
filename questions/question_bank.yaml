@@ -1,0 +1,34 @@
+# expected_tool: Analyst | ComplianceReview | any
+tier1:
+  - {id: t1-01, expected_tool: Analyst, question: "How many active contracts do we have?"}
+  - {id: t1-02, expected_tool: Analyst, question: "List all suppliers with Critical risk level"}
+  - {id: t1-03, expected_tool: Analyst, question: "What is the total number of customers?"}
+  - {id: t1-04, expected_tool: Analyst, question: "Show me all products in the Routing category"}
+  - {id: t1-05, expected_tool: Analyst, question: "How many shipments are currently in transit?"}
+  - {id: t1-06, expected_tool: Analyst, question: "What currencies do we support?"}
+  - {id: t1-07, expected_tool: Analyst, question: "List all countries in the EMEA region"}
+  - {id: t1-08, expected_tool: Analyst, question: "How many open compliance exceptions exist?"}
+  - {id: t1-09, expected_tool: Analyst, question: "What is the average contract line value?"}
+  - {id: t1-10, expected_tool: Analyst, question: "Show the most recent 5 contracts by start date"}
+tier2:
+  - {id: t2-01, expected_tool: Analyst, question: "Which customers in EMEA have contracts expiring in the next 90 days with total line value over $1M?"}
+  - {id: t2-02, expected_tool: Analyst, question: "Compare supplier risk distribution across regions"}
+  - {id: t2-03, expected_tool: Analyst, question: "Top 10 products by total contract line revenue with their primary supplier and risk level"}
+  - {id: t2-04, expected_tool: Analyst, question: "What is the month-over-month trend in new contract signings this year?"}
+  - {id: t2-05, expected_tool: Analyst, question: "Which suppliers have both High risk and shipments currently delayed?"}
+  - {id: t2-06, expected_tool: Analyst, question: "Break down contract value by customer country and product type"}
+  - {id: t2-07, expected_tool: Analyst, question: "List customers who have contracts with more than 3 different product types"}
+  - {id: t2-08, expected_tool: Analyst, question: "What percentage of shipment lines were delivered late by supplier?"}
+  - {id: t2-09, expected_tool: Analyst, question: "Show contracts where the total line value exceeds the contract header value by more than 10%"}
+  - {id: t2-10, expected_tool: Analyst, question: "Rank regions by total active contract value and count of unique customers"}
+tier3:
+  - {id: t3-01, expected_tool: ComplianceReview, question: "Run a compliance review on contract ACME-10001"}
+  - {id: t3-02, expected_tool: ComplianceReview, question: "Review compliance for contracts ACME-10000 through ACME-10020"}
+  - {id: t3-03, expected_tool: any, question: "Which contracts are at risk due to both supplier risk AND compliance violations?"}
+  - {id: t3-04, expected_tool: Analyst, question: "Summarize our exposure to sanctioned countries across all active contracts and recommend remediation"}
+  - {id: t3-05, expected_tool: Analyst, question: "For each compliance exception that is still open, identify the root cause and suggest a resolution path"}
+  - {id: t3-06, expected_tool: any, question: "Compare the compliance posture of our top 5 customers by contract value"}
+  - {id: t3-07, expected_tool: Analyst, question: "Identify contracts that use restricted products shipped through high-risk suppliers"}
+  - {id: t3-08, expected_tool: any, question: "Build a risk matrix of contracts by combining supplier risk, country risk, and compliance status"}
+  - {id: t3-09, expected_tool: any, question: "What is the financial exposure from contracts that would fail a compliance review?"}
+  - {id: t3-10, expected_tool: any, question: "Generate an executive summary of our compliance health with specific action items"}

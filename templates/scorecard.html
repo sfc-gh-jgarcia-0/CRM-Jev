@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="snowflake-source" content="cortex-agent-authored" />
+  <title>Jev Router Demo — Scorecard</title>
+  <script type="application/json" id="snowflake-report-metadata">{{ metadata | safe }}</script>
+  <style>
+    :root { color-scheme: light dark; --a: #64748b; --c: #29b5e8; }
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 1080px; width: 100%; box-sizing: border-box;
+           margin: 0 auto; padding: clamp(16px, 4vw, 28px); color: light-dark(#1f2937, #e5e7eb); }
+    h1, h2, h3 { color: light-dark(#0f172a, #f1f5f9); }
+    .muted { color: light-dark(#6b7280, #9ca3af); font-size: 0.9em; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+    .card { border: 1px solid light-dark(#e5e7eb, #374151); border-radius: 10px; padding: 14px; }
+    .card .k { font-size: 0.8em; text-transform: uppercase; letter-spacing: .04em; color: light-dark(#6b7280, #9ca3af); }
+    .card .v { font-size: 1.5em; font-weight: 650; margin-top: 4px; }
+    .good { color: light-dark(#15803d, #4ade80); } .bad { color: light-dark(#b91c1c, #f87171); }
+    .table-wrap { overflow-x: auto; margin: 12px 0 24px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.92em; }
+    th, td { border: 1px solid light-dark(#d1d5db, #374151); padding: 6px 9px; text-align: left; vertical-align: top; }
+    th { background: light-dark(#f3f4f6, #1f2937); font-weight: 600; }
+    td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .bar-row { display: grid; grid-template-columns: 54px 1fr 80px; align-items: center; gap: 8px; margin: 4px 0; font-size: 0.85em; }
+    .bar { height: 14px; border-radius: 3px; }
+    .bar.A { background: var(--a); } .bar.C { background: var(--c); }
+    .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin: 0 4px 0 12px; vertical-align: middle; }
+    details { margin: 4px 0; } summary { cursor: pointer; }
+    pre { white-space: pre-wrap; font-size: 0.85em; background: light-dark(#f8fafc, #111827); padding: 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+{% set A = aggs.get('A') %}{% set C = aggs.get('C') %}
+<h1>Jev Router Demo — Scorecard</h1>
+<p class="muted">Generated {{ generated }} · Agent <code>{{ cfg.agent_fqn }}</code> ·
+  Scenario A: <code>{{ cfg.baseline_model }}</code> for every query ·
+  Scenario C: <code>{{ cfg.jev_model }}</code> routes to T1 <code>{{ cfg.tier_models[1] }}</code> /
+  T2 <code>{{ cfg.tier_models[2] }}</code> / T3 <code>{{ cfg.tier_models[3] }}</code></p>
+
+<h2 id="summary">Summary</h2>
+{% if A and C %}
+<div class="cards">
+  {% for label, key, fmt, lower_better in [
+      ("Avg cost / query", "avg_cost_usd", "usd", True),
+      ("Avg latency", "avg_latency_ms", "ms", True),
+      ("P95 latency", "p95_latency_ms", "ms", True),
+      ("Avg tokens / query", "avg_tokens", "num", True),
+      ("Avg quality (1-10)", "avg_quality", "score", False)] %}
+    {% set d = delta(A[key], C[key]) %}
+    <div class="card"><div class="k">{{ label }}</div>
+      <div class="v">{{ C[key] | fmt(fmt) }}</div>
+      <div class="muted">vs {{ A[key] | fmt(fmt) }} (A)
+        {% if d is not none %}<span class="{{ 'good' if (d < 0) == lower_better else 'bad' }}">{{ d | delta }}</span>{% endif %}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Metric</th>{% for sc in aggs %}<th>Scenario {{ sc }}</th>{% endfor %}{% if A and C %}<th>C vs A</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for label, key, f in [
+      ("Queries (errors)", None, None),
+      ("Avg latency", "avg_latency_ms", "ms"), ("P50 latency", "p50_latency_ms", "ms"), ("P95 latency", "p95_latency_ms", "ms"),
+      ("Avg time to first token", "avg_ttft_ms", "ms"),
+      ("Avg total tokens / query", "avg_tokens", "num"), ("Avg input tokens", "avg_input_tokens", "num"),
+      ("  of which cache reads", "avg_cached_input_tokens", "num"), ("Avg output tokens", "avg_output_tokens", "num"),
+      ("Avg cost / query (est.)", "avg_cost_usd", "usd"), ("Total cost (est.)", "total_cost_usd", "usd"),
+      ("Avg quality score", "avg_quality", "score"), ("Tool selection correct", "tool_selection_rate", "pct"),
+      ("SQL executed OK", "sql_valid_rate", "pct"), ("Judge cost (excluded)", "judge_cost_usd", "usd")] %}
+    <tr><td>{{ label }}</td>
+    {% for sc, a in aggs.items() %}
+      <td class="n">{% if key %}{{ a[key] | fmt(f) }}{% else %}{{ a.n }} ({{ a.errors }}){% endif %}</td>
+    {% endfor %}
+    {% if A and C %}<td class="n">{% if key and f != 'pct' %}{{ delta(A[key], C[key]) | delta }}{% else %}—{% endif %}</td>{% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2 id="steps">Per-step breakdown (averages per query)</h2>
+<p class="muted">The Agent API reports tokens per model for the whole run, so orchestration tokens include planning,
+  tool-call generation and answer synthesis. Step latencies come from streamed event timestamps.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Step</th>{% for sc in aggs %}<th>{{ sc }} latency</th><th>{{ sc }} tokens</th><th>{{ sc }} cost</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for s in ["router", "orchestration", "tool_execution", "synthesis"] %}
+    <tr><td>{{ s }}</td>
+    {% for sc, a in aggs.items() %}{% set st = a.steps[s] %}
+      <td class="n">{{ st.avg_latency_ms | ms }}</td><td class="n">{{ st.avg_tokens | num }}</td><td class="n">{{ st.avg_cost_usd | usd }}</td>
+    {% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2 id="tiers">By question tier</h2>
+<p class="legend muted"><span style="background:var(--a)"></span>Scenario A<span style="background:var(--c)"></span>Scenario C</p>
+<div class="bars" id="bars"></div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Tier</th>{% for sc in aggs %}<th>{{ sc }} model(s)</th><th>{{ sc }} latency</th><th>{{ sc }} cost</th><th>{{ sc }} tokens</th><th>{{ sc }} quality</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for t in [1, 2, 3] %}<tr><td>Tier {{ t }}</td>
+    {% for sc, a in aggs.items() %}{% set bt = a.by_tier.get(t) %}
+      {% if bt %}<td>{{ bt.models | join(', ') }}</td><td class="n">{{ bt.avg_latency_ms | ms }}</td><td class="n">{{ bt.avg_cost_usd | usd }}</td>
+        <td class="n">{{ bt.avg_tokens | num }}</td><td class="n">{{ bt.avg_quality | score }}</td>
+      {% else %}<td colspan="5">—</td>{% endif %}
+    {% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+{% if C and C.router %}
+<h2 id="router">Jev router</h2>
+<div class="cards">
+  <div class="card"><div class="k">Raw routing accuracy</div><div class="v">{{ C.router.raw_accuracy | pct }}</div></div>
+  <div class="card"><div class="k">Final accuracy (after escalation)</div><div class="v">{{ C.router.accuracy | pct }}</div></div>
+  <div class="card"><div class="k">Under-routed (quality risk)</div><div class="v">{{ C.router.under_routed }}</div></div>
+  <div class="card"><div class="k">Over-routed (cost leak)</div><div class="v">{{ C.router.over_routed }}</div></div>
+  <div class="card"><div class="k">Low-confidence escalations</div><div class="v">{{ C.router.escalations }}</div></div>
+  <div class="card"><div class="k">Avg router latency</div><div class="v">{{ C.steps.router.avg_latency_ms | ms }}</div></div>
+</div>
+{% endif %}
+
+<h2 id="queries">Per-query detail</h2>
+{% for sc, rows in results.items() %}
+<h3>Scenario {{ sc }}</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>ID</th><th>Question</th>{% if sc == 'C' %}<th>Routed</th>{% endif %}<th>Model</th><th>Latency</th><th>Tokens</th><th>Cost</th><th>Quality</th><th>Tools</th></tr></thead>
+  <tbody>
+  {% for r in rows %}<tr>
+    <td>{{ r.query_id }}</td>
+    <td><details><summary>{{ r.question }}</summary>
+      {% if r.error %}<p class="bad">{{ r.error }}</p>{% endif %}
+      <pre>{{ r.answer }}</pre><p class="muted">Judge: {{ r.quality.rationale }}</p>
+      <div class="table-wrap"><table><tr><th>Step</th><th>Model / tool</th><th>Latency</th><th>Tokens (in / cached / out)</th><th>Cost</th></tr>
+      {% for s in r.steps %}<tr><td>{{ s.step }}</td><td>{{ s.model or s.tool }}</td><td class="n">{{ s.latency_ms | ms }}</td>
+        <td class="n">{% if s.tokens %}{{ s.tokens.input_tokens | num }} / {{ s.tokens.cache_read_tokens | num }} / {{ s.tokens.output_tokens | num }}{% else %}—{% endif %}</td>
+        <td class="n">{{ s.cost_usd | usd }}</td></tr>{% endfor %}
+      </table></div></details></td>
+    {% if sc == 'C' %}<td>{% if r.routing %}T{{ r.routing.tier }}{% if r.routing.escalated %}*{% endif %} ({{ '%.2f' % r.routing.confidence }}){% if r.routing.tier != r.expected_tier %} <span class="bad">exp T{{ r.expected_tier }}</span>{% endif %}{% endif %}</td>{% endif %}
+    <td>{{ r.agent_model }}</td><td class="n">{{ r.total_latency_ms | ms }}</td><td class="n">{{ r.tokens.total | num }}</td>
+    <td class="n">{{ r.cost_usd | usd }}</td><td class="n">{{ r.quality.score | score }}</td><td>{{ r.tools_used | join(', ') }}</td>
+  </tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endfor %}
+
+<p class="muted">Costs are estimates from <code>config/pricing.yaml</code> at ${{ '%.2f' % cfg.credit_price_usd }}/credit and exclude
+  warehouse SQL compute. Billed credits: run <code>reconcile.sql</code> in this results folder.</p>
+
+<script>
+  const data = {{ chart_data | safe }};
+  const metrics = [["tier_cost", "Avg cost / query", v => "$" + v.toFixed(4)],
+                   ["tier_latency", "Avg latency", v => (v / 1000).toFixed(1) + "s"],
+                   ["tier_quality", "Avg quality", v => v.toFixed(2)]];
+  const root = document.getElementById("bars");
+  for (const [key, title, fmt] of metrics) {
+    const box = document.createElement("div");
+    const h = document.createElement("h3"); h.textContent = title; box.appendChild(h);
+    const all = Object.values(data).flatMap(d => d[key]).filter(v => v != null);
+    const max = Math.max(...all, 1e-9);
+    [1, 2, 3].forEach((tier, i) => {
+      for (const sc of Object.keys(data)) {
+        const v = data[sc][key][i];
+        const row = document.createElement("div"); row.className = "bar-row";
+        const lab = document.createElement("span"); lab.textContent = `T${tier} ${sc}`;
+        const track = document.createElement("div");
+        const bar = document.createElement("div"); bar.className = "bar " + sc;
+        bar.style.width = v == null ? "0" : (v / max * 100) + "%";
+        track.appendChild(bar);
+        const val = document.createElement("span"); val.textContent = v == null ? "—" : fmt(v);
+        row.append(lab, track, val); box.appendChild(row);
+      }
+    });
+    root.appendChild(box);
+  }
+</script>
+</body>
+</html>
